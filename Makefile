@@ -3,9 +3,9 @@
 #
 
 CONFIG   = max
-CPPFLAGS =
+CPPFLAGS = -Wall -O2 -std=c++11 -g
 CXXFLAGS =
-LDFLAGS  =
+LDFLAGS  = -lpthread -lzmqpp -lzmq -lsodium -Wl,--no-as-needed
 
 PREFIX = /usr/local
 BINDIR = $(DESTDIR)$(PREFIX)/bin
@@ -145,16 +145,77 @@ TEST_SUITES := ${addprefix test-,${sort ${shell find ${TESTS_PATH} -iname *.cpp 
 #
 # BUILD Targets - Standardised
 #
+DEBUG=1
+ifeq ($(DEBUG),1)
+   BUILD_MODE=debug
+endif
+
+PROJECT_ROOT = $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
+SOURCE = src/
+
+#OBJS = zmq_pty.o
+#EXTRA_CMDS += '$( if [ 0 == $(id -u) ]; then chmod a+x bin/* else sudo chmod a+x bin/* ; fi )'
+
+ifeq ($(BUILD_MODE),debug)
+	CFLAGS += -g -O0
+else ifeq ($(BUILD_MODE),run)
+	CFLAGS += -O2
+else ifeq ($(BUILD_MODE),profile)
+	CFLAGS += -g -pg -fprofile-arcs -ftest-coverage
+	LDFLAGS += -pg -fprofile-arcs -ftest-coverage
+	EXTRA_CLEAN += zmq_pty.gcda zmq_pty.gcno $(PROJECT_ROOT)gmon.out
+	EXTRA_CMDS = rm -rf zmq_pty.gcda
+else
+    $(error Build mode $(BUILD_MODE) not supported by this Makefile)
+endif
+
+GXX = g++
+
+ifeq ("$(DEBUG)","1")
+	CFLAGS += -Wall -Wextra -O0 -Wunused
+else
+	CFLAGS += -Wall -Wextra -O2 -D DOCTEST_CONFIG_DISABLE #-D DEBUG=0
+endif
 
 .PHONY: clean uninstall test $(TEST_SUITES)
+
+zmq_pty_client:
+	$(GXX) $(CFLAGS) $(LDFLAGS) $(SOURCE)zmq__pty_client.cpp -o bin/$@ $^
+	$(EXTRA_CMDS)
+
+zmq_pty_server:
+	$(GXX) $(CFLAGS) $(LDFLAGS) $(SOURCE)zmq_pty_server.cpp -o bin/$@ $^
+	$(EXTRA_CMDS)
 
 main: $(LIBRARY_SHARED) $(LIBRARY_ARCHIVE)
 	@echo "use make check to test the build"
 
-all: $(LIBRARY_SHARED) $(LIBRARY_ARCHIVE) $(CLIENT_TARGET)
+examples: $(LIBRARY_SHARED) $(LIBRARY_ARCHIVE)
+	$(GXX) $(CFLAGS) $(LDFLAGS) examples/simple_client.cpp -o bin/simple_client $^
+	$(GXX) $(CFLAGS) $(LDFLAGS) examples/simple_server.cpp -o bin/simple_server $^
+
+all: $(LIBRARY_SHARED) $(LIBRARY_ARCHIVE) $(CLIENT_TARGET) zmq_pty_client zmq_pty_server
 	@echo "use make check to test the build"
 
 check: $(LIBRARY_SHARED) $(LIBRARY_ARCHIVE) test
+
+%.o:	$(PROJECT_ROOT)%.cpp
+	$(GXX) -c $(CFLAGS) $(GXXFLAGS) $(CPPFLAGS) -o $@ $<
+
+%.o:	$(PROJECT_ROOT)%.c
+	$(CC) -c $(CFLAGS) -o $@ $<
+
+doc:
+	@echo "Source code documentation: doc/html/index.html"
+	doxygen -u
+	doxygen
+	$(shell rm Doxyfile.bak)
+
+clean:
+	rm -fr zmq_pty $(OBJS) $(EXTRA_CLEAN)
+	$(shell touch build/cleanprepare && rm -rf build/*)
+	$(shell touch bin/cleanprepare && rm bin/*)
+	$(shell touch doc/cleanprepare && rm -rf doc/*)
 
 install:
 	sed 's/^Version.*/Version: $(APP_VERSION)/g' $(SRC_PATH)/$(PKGCONFIG_FILE) > $(BUILD_PATH)/$(PKGCONFIG_FILE)
@@ -185,10 +246,6 @@ uninstall:
 	rm -f $(LIBDIR)/$(LIBRARY_SHARED)
 	rm -f $(LIBDIR)/$(LIBRARY_ARCHIVE)
 	rm -f $(BINDIR)/$(CLIENT_TARGET)
-
-clean:
-	rm -rf build/*
-	rm -rf docs
 
 client: $(CLIENT_TARGET)
 
