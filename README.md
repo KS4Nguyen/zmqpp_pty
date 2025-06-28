@@ -5,20 +5,27 @@ libzmq:
 
 	(ref. A) https://github.com/zeromq/zmqpp
 
-In addition the **zmq_client** and **zmq_server** generate a PTY device in the
-Linux userspace:
+In addition the **zmq_pty_client** and **zmq_pty_server** generate a PTY device
+in the Linux userspace:
 
 	/dev/ttyz0
 	/dev/ttyz1
 
 ## Command-Line Client
 
-The client is built on top of the libzmqpp bindings.
+**Not finished yet.**
 
+	build/zmq_pty_client
+
+The ZMQPP client is built on top of the libzmqpp bindings:
+
+	build/<arch>/zmqpp
 
 ## Command-Line Server
 
-<TODO>
+**Not finished yet.**
+
+build/zmq_pty_server
 
 
 # Installation
@@ -37,24 +44,37 @@ Install dependencies:
 
 Install:
 
-	make
-	make install
+	make all
+	make pty
+	sudo make install
 
 "If the boost unittest framework is installed, check and installcheck can be run
-for sanity checking. " (ref. A)
+for sanity checking. " (ref. A):
 
 	make check
-	make installcheck
+	sudo make installcheck
 
 
 ## libzmqpp
 
 __ZMQPP__
+
+libzmqpp.a
+libzmqpp.so
+
+...will be installed to:
+
+	/usr/local/lib
+
 "The install process will only install headers and the shared object to the
 system. The archive will remain in the build directory." (ref. A)
 
 __ZMQ__
-Will be installed to:
+
+libzmq.a
+libzmq.so
+
+...will be installed to:
 
 	/usr/local/lib
 
@@ -69,7 +89,7 @@ To build the documentation with doxygen use:
 	doxygen -u
 	doxygen
 
-And the resulting html [...]" can be found at
+And the resulting html [...]" can be found at:
 
 	docs/html/index.html
 
@@ -116,22 +136,6 @@ the MPLv2 license (see LICENSE for details).
 They can either be included directly into any 0mq using project or used as a
 library. A really basic Makefile is provided for this purpose and will generate
 both shared and static libraries. [...]" (ref. A)
-
-
-3) Linking
-
-"If you ever happen to want to link against installed libraries in a give
-directory, LIBDIR, you must either use libtool, and specify the full pathname of
-the library, or use the '-LLIBDIR' flag during linking and do at least one of
-the following:
-
-	- add LIBDIR to the 'LD_LIBRARY_PATH' environment variable during execution
-	- add LIBDIR to the 'LD_RUN_PATH' environment variable during linking
-	- use the '-Wl,-rpath -Wl,LIBDIR' linker flag
-	- have your system administrator add LIBDIR to '/etc/ld.so.conf'
-
-See any operating system documentation about shared libraries for more
-information, such as the ld(1) and ld.so(8) manual pages."
 
 
 # Licensing
