@@ -1,12 +1,23 @@
 #include <iostream>
 #include <string>
 #include <chrono>
-
 #include <assert.h>
+
+#include "unistd.h"
+
+/*
+#include <cstdlib>
+#include <array>
+#include <tuple>
+*/
 
 #include <zmqpp/zmqpp.hpp>
 
-#include "unistd.h"
+//#include "options.hpp"
+
+#ifndef BUILD_CLIENT_NAME
+  #define BUILD_CLIENT_NAME "zmqpp_pty_client"
+#endif
 
 /*
 #ifdef _POSIX_

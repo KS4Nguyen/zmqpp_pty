@@ -1,5 +1,14 @@
+# Build output
 build
+examples
+
+# Documentation
+Doxyfile.bak
 docs
+
+# Development
 .cproject
 .project
 .settings
+deprecated
+
