@@ -1,24 +1,51 @@
-#include <zmqpp/zmqpp.hpp>
-#include <zmq.h>
-#include <string>
 #include <cstdio>
 #include <iostream>
+#include <string>
 #include <chrono>
-#include <thread>
 
-#include <unistd.h>
+//#include <unistd.h>
+
+#include <zmqpp/zmqpp.hpp>
 #include <assert.h>
 
+#ifdef _POSIX_
+  #include "pthreads.h"
+#else
+  #include <thread>
+#endif
+
+//#include "common.h"
+
+#define VERSION "0.1"
+
+using namespace std;
+
+const string version = VERSION;
+
 int main(int argc, char *argv[]) {
-  const std::string endpoint = "tcp://*:5555";
+  const string endpoint = "tcp://*:4242";
   int major, minor, patch;
-  std::string zmqver;
+  string zmqver;
   
   zmq_version (&major, &minor, &patch);
-  zmqver = ToString( major ) + "." + ToString( minor ) + "." + ToString( patch );
-  //sprintf (zmqver, "%d.%d.%d", major, minor, patch);
+
+/*
+#ifdef _COMMON_HELPERS
+  zmqver = concat( itoc( sizeof( long int ), (long int *)major ), ".", \
+                   itoc( sizeof( long int ), (long int *)minor ), ".", \
+                   itoc( sizeof( long int ), (long int *)patch ) \
+                 );
+#else
+  #ifdef _STRING_H
+  zmqver = to_char(mayor) + "." + to_char(minor) + "." + to_char(patch);
+  #else
+  zmqver = 0.0.0;
+  #endif
+#endif
+*/
   
   printf ("0MQ version: %d.%d.%d\n", major, minor, patch);
+
   // initialize the 0MQ context
   zmqpp::context context;
 
@@ -28,7 +55,7 @@ int main(int argc, char *argv[]) {
 
   // bind to the socket
   socket.bind(endpoint);
-  std::string text;
+  string text;
 
   while (1) {
     // receive the message
@@ -39,8 +66,8 @@ int main(int argc, char *argv[]) {
     message >> text;
 
     //Do some 'work'
-    std::this_thread::sleep_for(std::chrono::seconds(1));
-    std::cout << "Received Hello" << std::endl;
+    this_thread::sleep_for(chrono::seconds(1));
+    cout << "Received Hello" << endl;
     socket.send("World");
   }
 

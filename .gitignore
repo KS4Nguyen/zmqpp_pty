@@ -4,11 +4,11 @@ examples
 
 # Documentation
 Doxyfile.bak
-docs
+docs/*
 
 # Development
 .cproject
 .project
 .settings
 deprecated
-
+.vs

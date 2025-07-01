@@ -151,7 +151,7 @@ TEST_SUITES := ${addprefix test-,${sort ${shell find ${TESTS_PATH} -iname *.cpp 
 main: $(LIBRARY_SHARED) $(LIBRARY_ARCHIVE)
 	@echo "use make check to test the build"
 
-all: $(LIBRARY_SHARED) $(LIBRARY_ARCHIVE) $(CLIENT_TARGET)
+all: $(LIBRARY_SHARED) $(LIBRARY_ARCHIVE) $(CLIENT_TARGET) pty
 	@echo "use make check to test the build"
 
 check: $(LIBRARY_SHARED) $(LIBRARY_ARCHIVE) test
