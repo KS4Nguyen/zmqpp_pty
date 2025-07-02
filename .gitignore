@@ -1,6 +1,8 @@
 # Build output
 build
 examples
+Debug
+Release
 
 # Documentation
 Doxyfile.bak
@@ -11,4 +13,5 @@ docs/*
 .project
 .settings
 deprecated
-.vs
+.externalToolBuilders
+
