@@ -1,16 +1,30 @@
-GXX				= gcc
-CFLAGS			= -I. $(DOCTEST) -fmax-errors=4 -Wno-unused-result -Wno-unused-function
-CPP			    = g++
-CPPFLAGS		= -I. $(DOCTEST) -std=c++11 -g
+#
+# Tools
+#
 
-RM			    = rm -f
+GCC		= gcc
+CPP		= g++
+CXX      = $(CPP)
 
+# Build values
 
-INC += -I./
+LD       = $(CXX)
+AR       = ar
 
-LDFLAGS			= -lpthread -lzmqpp -lzmq -lsodium -Wl,--no-as-needed
-SOURCES			= $(wildcard *.cpp)
-TARGETS			= $(SOURCES:%.cpp=%)
+RM			= rm -f
+
+INC += -I$(INCLUDEDIR) -I$(COMMON_DIR) -I/usr/local/include
+
+CFLAGS	= $(INC) $(DOCTEST) -fmax-errors=4 -Wno-unused-result -Wno-unused-function
+CPPFLAGS	= $(INC) $(DOCTEST) -std=c++11 -g
+CXXFLAGS	= $(INC) $(DOCTEST) -std=c++11 -g
+
+# Paths
+LD_LIBRARY_PATH = -L$(LIBDIR) -Wl,-rpath=$(LIBDIR)
+
+LDFLAGS	= -lpthread -lzmqpp -lzmq -lsodium -Wl,--no-as-needed
+SOURCES	= $(wildcard *.cpp)
+TARGETS	= $(SOURCES:%.cpp=%)
 
 # use common.c and common.h
 COMMON_LIB := libcommon.a

@@ -100,32 +100,6 @@ And the resulting html [...]" can be found at:
 
 	./sync_fork.h
 
-"
-  +-------+
-  | ZMQPP |
-  +-------+
-      |
-      | git checkout upstream/master
-      |
-      v 
-+-----------+
-| ZMQPP_PTY |
-|  (local)  |
-+-----------+
-      |
-      | git add .
-      | git commit "<change note>
-      | git merge upstream/master
-      | git push origin
-      |
-      v
-+-----------+
-| ZMQPP_PTY |
-| (origin)  |
-+-----------+
-
-"
-
 2) Library / Bindings
 
 "This C++ binding for 0mq/zmq is a 'high-level' library that hides most of the

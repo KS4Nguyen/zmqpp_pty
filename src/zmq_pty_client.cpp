@@ -3,16 +3,14 @@
 #include <assert.h>
 
 /**
- * @brief Doctest unit 
+ * @brief Doctest unit
+ */
 ///@}
 
 #include "unistd.h"
 
-/*
-#include <cstdlib>
-#include <array>
-#include <tuple>
-*/
+//#include <array>
+//#include <tuple>
 
 #include <zmqpp/zmqpp.hpp>
 
@@ -65,15 +63,14 @@ int main( int argc, char *args[] )
   
   //vsprintf( endpoint, "tcp://", ipaddr, ":", port );
 
-  switch ( stype ) {
-    case "pub"  : type = zmqpp::socket_type::pub;
-    case "sub"  : type = zmqpp::socket_type::sub;
-    case "push" : type = zmqpp::socket_type::push;
-    case "pull" : type = zmqpp::socket_type::pull;
-    case "req"  : type = zmqpp::socket_type::req;
-    case "pub"  : type = zmqpp::socket_type::res;
-    default    :
-      cout << "Error: Unkown socket type!" << endl;
+  if ( stype == "pub"  ) { type = zmqpp::socket_type::pub; }  else
+  if ( stype == "sub"  ) { type = zmqpp::socket_type::sub; }  else
+  if ( stype == "push" ) { type = zmqpp::socket_type::push; } else
+  if ( stype == "pull" ) { type = zmqpp::socket_type::pull; } else
+  if ( stype == "req"  ) { type = zmqpp::socket_type::req; }  else
+  //if ( stype == "res"  ) { type = zmqpp::socket_type::res; } else
+  {
+      cout << "Error: Unknown socket type!" << endl;
       printhelp();
       goto CLEANUP;
   }
@@ -105,7 +102,7 @@ int main( int argc, char *args[] )
   
   while ( 1 ) {
     if ( new_msg > 0 ) {
-      lock_guard<std::mutex> lock( mtx_receive );
+      thread::lock_guard<std::mutex> lock( mtx_receive );
         cout << rx_buff[new_msg-1] << endl;
 
         // Discard latest message
