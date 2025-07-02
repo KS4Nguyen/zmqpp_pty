@@ -1,53 +1,84 @@
 #include <iostream>
 #include <string>
 #include <assert.h>
-
-/**
- * @brief Doctest unit
- */
-///@}
-
+//#include <algorithm> // Required for std::sort
 #include "unistd.h"
 
-//#include <array>
-//#include <tuple>
-
 #include <zmqpp/zmqpp.hpp>
-
 //#include "options.hpp"
 
 #ifndef BUILD_CLIENT_NAME
   #define BUILD_CLIENT_NAME "zmqpp_pty_client"
 #endif
 
-
-#ifdef _POSIX_
-  #include "pthreads.h"
-#else
-  #include <thread>
-#endif
+//#include "pthreads.h"
+#include <thread>
+#include <mutex>
 
 #include <atomic>
 
+
 using namespace std;
 
-void printhelp();
+#define VERSION "0.0.2"
+
+/******************************************************************************
+ * @name    printhelp()
+ * @brief   Usage of the program.
+ ******************************************************************************/
+
+void printhelp()
+{
+   cout << "Usage: zmq_client <Endpoint> <Socket-Type> [Options]\n";
+   cout << "  Endpoint:    Format like tcp://127.0.0.1:4242";
+   cout << "  Socket-Type: One od the following:";
+   cout << "               pub, sub, push, pull, req, res";
+   cout << "  Options:";
+   cout << "  -v  Verbose mode.";
+   cout << "  -h  Peint this help.";
+}
+
+/******************************************************************************
+ * @name    receive()
+ * @brief   Receive ZMQ message, thread.
+ * @param   *s      Pointer to ZMQ socket, where to grab incomming messages.
+ * @param   *buff   Pointer to messae buffer.
+ ******************************************************************************/
+
+///@{
+atomic<int> new_msg (0);
+mutex mtx_get_message; // mutex for all resourcrs shared with recept()
+
+void get_message( zmqpp::socket *s, vector<string> *buff )
+{
+  zmqpp::message rx_msg;
+  string *string_msg;
+  string_msg = (string*)&rx_msg; // TODO Check if this is a safe type conversion.
+
+  while ( NULL != s ) {
+    if ( true == s->receive(rx_msg, false) ) { // TODO lock socket aka *s.
+      mtx_get_message.lock();
+      //lock_guard<std::mutex> lock( mtx_get_message );
+        buff->push_back( *string_msg );
+        new_msg++;
+      mtx_get_message.unlock();
+      //lock_guard<std::mutex> unlock( mtx_get_message);
+    }
+  }
+}
+ ///@}
 
 /******************************************************************************
  * @name    main()
  * @brief   Connect to ZMQ socket, send message and listen to server answer.
  ******************************************************************************/
 
-#define VERSION "0.0.2"
-
 const string version = VERSION;
-atomic<int> new_msg (0);
-thread::mutex mtx_receive; // mutex for all resourcrs shared with recept()
+
 
 int main( int argc, char *args[] )
 {
   int  rc = 0;           // return code assertion
-  bool rs = false;       // return state (zmqpp::receive return value)
   int verbose = 0;
 
   const string pname    = args[0];
@@ -56,12 +87,13 @@ int main( int argc, char *args[] )
   
   zmqpp::context context;
   zmqpp::socket_type type;
+  bool socket_initialized = false;
   
-  string rx_buff[10];
-  char* latest_message = rx_buff[0];
+  vector<string> rx_buff;
+
   zmqpp::message tx_msg;  // send message
-  
-  //vsprintf( endpoint, "tcp://", ipaddr, ":", port );
+  string *tx_msg_string;
+  tx_msg_string = (string*)&tx_msg;
 
   if ( stype == "pub"  ) { type = zmqpp::socket_type::pub; }  else
   if ( stype == "sub"  ) { type = zmqpp::socket_type::sub; }  else
@@ -72,12 +104,13 @@ int main( int argc, char *args[] )
   {
       cout << "Error: Unknown socket type!" << endl;
       printhelp();
-      goto CLEANUP;
+      return ( -2 );
   }
   
   zmqpp::socket socket( context, type );
-  socket.bind(  ); // TODO Need ex handler here
+  socket.bind( endpoint );
   socket.connect( endpoint );
+  socket_initialized = true;
 
   /****************************************************
    * @description    Compose a message from a string
@@ -95,75 +128,59 @@ int main( int argc, char *args[] )
    ****************************************************/
 
   ///@{
-  //std::lock_guard<std::mutex> lock(mtx);
-  
-  thread thr_receive( receive, &socket, rx_buff[0] );
-  t.detach();
+
+  std::thread thr_receive(
+      get_message,      // void(*)(socket*, vector*)
+      &socket,          // zmqpp::socket*
+      &rx_buff          // std::vector<std::string>*
+  );
+
+  //thr_receive.detach();
   
   while ( 1 ) {
     if ( new_msg > 0 ) {
-      thread::lock_guard<std::mutex> lock( mtx_receive );
+      if ( mtx_get_message.try_lock() ) {
         cout << rx_buff[new_msg-1] << endl;
 
         // Discard latest message
-        rx_buff[new_msg-1] = "\0";
-        latest_message = &rx_buff[--new_msg]; 
-      lock_guard<std::mutex> unlock( mtx_receive );
+        rx_buff.pop_back();
+        new_msg--;
+
+        // TODO Make buffer a FIFO:
+        //std::sort( rx_buff.begin(), rx_buff.end() );
+
+        mtx_get_message.unlock();
+      }
     }
-    
-    tx_msg << cin;
+    std::getline( cin, *tx_msg_string);
     socket.send( tx_msg );
   }
-
   ///@}
-  CLEANUP:
+
+  if ( socket_initialized )
+    socket.close();
+
+  thr_receive.join();
   if ( verbose == 1 ) {
     cout << "Terminating (" << rc << ")" << endl;
   }
+
   return rc;
 }
 
-void receive( zmqpp::socket* s, string* buff ) 
-{
-  int healthy = 1;
-  zmqpp::message rx_msg; // receive buffer
-  
-  lock_guard<std::mutex> lock( mtx_receive );
-  	buff = rx_msg; // TODO Sanity check for buffer size!
-  lock_guard<std::mutex> unlock( mtx_receive);
+/**
+ * @TODO  Replace send() & receive() with raw data handling
+ *
 
-  while ( healthy == 1 ) {
-	if ( true == s.receive( rx_msg ) {
-      lock_guard<std::mutex> lock( mtx_receive );
-		*buff = rx_msg;
-		/** 
-		 * @note Dynamically realloc() buffer size in case of ZMQPP
-		 *       message size exceeds rx_msg size.
-		 */
+  bool zmqpp::socket::receive_raw  (   char *    buffer,
+    size_t &    length,
+    int const   flags = normal
+  )
 
-		/*
-		 * try
-		 * 
-		 * realloc( )
-		 * 
-		 */
-		new_msg++;
-      lock_guard<std::mutex> unlock( mtx_receive);
-  }
-}
-/******************************************************************************
- * @name    printhelp()
- * @brief   Usage of the program.
- ******************************************************************************/
+  bool zmqpp::socket::send_raw  (   char const *    buffer,
+    size_t const    length,
+    int const   flags = normal
+  )
 
-void printhelp()
-{
-   cout << "Usage: zmq_client <Endpoint> <Socket-Type> [Options]\n";
-   cout << "  Endpoint:    Format like tcp://127.0.0.1:4242";
-   cout << "  Socket-Type: One od the following:";
-   cout << "               pub, sub, push, pull, req, res";
-   cout << "  Options:";
-   cout << "  -v  Verbose mode.";
-   cout << "  -h  Peint this help.";
-}
+*/
 
