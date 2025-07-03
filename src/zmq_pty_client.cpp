@@ -11,7 +11,6 @@
   #define BUILD_CLIENT_NAME "zmqpp_pty_client"
 #endif
 
-//#include "pthreads.h"
 #include <thread>
 #include <mutex>
 
@@ -35,7 +34,7 @@ void printhelp()
    cout << "               pub, sub, push, pull, req, res";
    cout << "  Options:";
    cout << "  -v  Verbose mode.";
-   cout << "  -h  Peint this help.";
+   cout << "  -h  Print this help.";
 }
 
 /******************************************************************************
