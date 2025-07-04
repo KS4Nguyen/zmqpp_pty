@@ -42,7 +42,7 @@ int main(int argc, char *argv[]) {
   //if ( stype == "res"  ) { type = zmqpp::socket_type::res; } else
   {
       cout << "Error: Unknown socket type!" << endl;
-      cout << "Terminated."
+      cout << "Terminated.";
       return ( -2 );
   }
    

@@ -3,27 +3,50 @@
 // Author      : KS4Nguyen
 // Version     :
 // Copyright   : MPL v2.0
-// Description : Hello World in C++, Ansi-style
+// Description : Hello World in C++ (Thread)
 //============================================================================
 
 #include <iostream>
 
 #include <thread>
+#include <atomic>
+
+#include <chrono>
 
 using namespace std;
 
-void hello( int limit ) {
-	int loop = limit;
-	while ( loop++ < 3 ) {
-		cout << "Hello World. (" << loop << ")"<< endl;
-	}	
+atomic<int> msg_cnt;
+atomic<bool> hello_running;
+
+void hello( int threshold, string *buff ) {
+	int loop = threshold;
+	while ( loop-- > 0 ) {
+		this_thread::sleep_for( chrono::milliseconds(50) );
+		*buff = "Hello World. (" + to_string(loop) + ")";
+	}
+	hello_running = 0;
 }
 
 int main() {
-	const int limit = 3;
-	thread t( hello, limit ); 
+	int limit = 3;
+    string msg_buff, msg_buff_old = "\0";
+    
+    msg_buff = "Looping... (" + to_string(limit) + ")";
+    cout << msg_buff << endl;
+    msg_buff = "\0";
+    
+    hello_running = 1;
+	thread t( hello, limit, &msg_buff );
+
+	while ( hello_running ) {
+		if ( msg_buff != msg_buff_old ) {
+			cout << msg_buff << endl;
+			msg_buff_old = msg_buff;
+		}
+	}
 
 	t.join();
+	return 0;
 }
 
 
