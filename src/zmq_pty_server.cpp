@@ -1,68 +1,71 @@
-/**
- * \brief  ZMQPP Server with PTS in Linux filesysyem.
- */
-
-#include <string>
+#include <cstdio>
 #include <iostream>
+#include <string>
+#include <chrono>
+
+//#include <unistd.h>
 
 #include <zmqpp/zmqpp.hpp>
-
-#ifndef BUILD_CLIENT_NAME
-  #define BUILD_CLIENT_NAME "zmqpp_pty_client"
-#endif
+#include <assert.h>
 
 #include <thread>
-#include <mutex>
+//#include "pthreads.h"
 
-#include <atomic>
+//#include "common.h"
+
+#define VERSION "0.1"
 
 using namespace std;
 
-int main(int argc, char *argv[]) {
-  const string port  = args[1];
-  const string stype = args[2];
-   
-  zmqpp::socket_type type;
-  bool socket_initialized = false;
-   bool verbose = 1;
-  
-  vector<string> rx_buff;
+const string version = VERSION;
 
-  zmqpp::message rx_msg;  // send message
-  string *rx_msg_string;
-  rx_msg_string = (string*)&rx_msg;
-   
-   const string endpoint = "tcp://*:" + port;
-   
-  if ( stype == "pub"  ) { type = zmqpp::socket_type::pub; }  else
-  if ( stype == "sub"  ) { type = zmqpp::socket_type::sub; }  else
-  if ( stype == "push" ) { type = zmqpp::socket_type::push; } else
-  if ( stype == "pull" ) { type = zmqpp::socket_type::pull; } else
-  if ( stype == "req"  ) { type = zmqpp::socket_type::req; }  else
-  //if ( stype == "res"  ) { type = zmqpp::socket_type::res; } else
-  {
-      cout << "Error: Unknown socket type!" << endl;
-      cout << "Terminated.";
-      return ( -2 );
-  }
-   
+int main(int argc, char *argv[]) {
+  const string endpoint = "tcp://*:4242";
+  int major, minor, patch;
+  string zmqver;
+  
+  zmq_version (&major, &minor, &patch);
+
+/*
+#ifdef _COMMON_HELPERS
+  zmqver = concat( itoc( sizeof( long int ), (long int *)major ), ".", \
+                   itoc( sizeof( long int ), (long int *)minor ), ".", \
+                   itoc( sizeof( long int ), (long int *)patch ) \
+                 );
+#else
+  #ifdef _STRING_H
+  zmqver = to_char(mayor) + "." + to_char(minor) + "." + to_char(patch);
+  #else
+  zmqver = 0.0.0;
+  #endif
+#endif
+*/
+  
+  printf ("0MQ version: %d.%d.%d\n", major, minor, patch);
+
   // initialize the 0MQ context
   zmqpp::context context;
 
   // generate a pull socket
+  zmqpp::socket_type type = zmqpp::socket_type::reply;
   zmqpp::socket socket (context, type);
 
   // bind to the socket
-  cout << "Binding to " << endpoint << "..." << endl;
   socket.bind(endpoint);
-  zmqpp::message message;
-   
-  // receive the message
+  string text;
+
   while (1) {
-     // decompose the message
-     socket.receive(message);
-     cout << *rx_msg_string << endl;
+    // receive the message
+    zmqpp::message message;
+    // decompose the message 
+    socket.receive(message);
+
+    message >> text;
+
+    //Do some 'work'
+    this_thread::sleep_for(chrono::seconds(1));
+    cout << "Received Hello" << endl;
+    socket.send("World");
   }
-  if ( verbose )
-   cout << args[0] << ": Terminated." << endl;
+
 }
