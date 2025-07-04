@@ -7,9 +7,23 @@
 //============================================================================
 
 #include <iostream>
+
+#include <thread>
+
 using namespace std;
 
-int main() {
-	cout << "!!!Hello World!!!" << endl; // prints !!!Hello World!!!
-	return 0;
+void hello( int limit ) {
+	int loop = limit;
+	while ( loop++ < 3 ) {
+		cout << "Hello World. (" << loop << ")"<< endl;
+	}	
 }
+
+int main() {
+	const int limit = 3;
+	thread t( hello, limit ); 
+
+	t.join();
+}
+
+
