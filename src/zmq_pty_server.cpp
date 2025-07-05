@@ -20,7 +20,7 @@ using namespace std;
 const string version = VERSION;
 
 int main(int argc, char *argv[]) {
-  const string endpoint = "tcp://*:4242";
+  const string endpoint = "tcp://127.0.0.1:4242";
   int major, minor, patch;
   string zmqver;
   
@@ -64,8 +64,8 @@ int main(int argc, char *argv[]) {
 
     //Do some 'work'
     this_thread::sleep_for(chrono::seconds(1));
-    cout << "Received Hello" << endl;
-    socket.send("World");
+    cout << text << endl;
+    socket.send("End.\n");
   }
 
 }

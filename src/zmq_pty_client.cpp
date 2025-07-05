@@ -21,6 +21,7 @@ using namespace std;
 
 #define VERSION "0.0.2"
 
+
 /******************************************************************************
  * @name    printhelp()
  * @brief   Usage of the program.
@@ -28,13 +29,40 @@ using namespace std;
 
 void printhelp()
 {
-   cout << "Usage: zmq_client <Endpoint> <Socket-Type> [Options]\n";
+
+   cout << "Usage: zmq_client <Socket-Type> <Endpoint> [Options]\n";
    cout << "  Endpoint:    Format like tcp://127.0.0.1:4242";
    cout << "  Socket-Type: One od the following:";
    cout << "               pub, sub, push, pull, req, res";
    cout << "  Options:";
    cout << "  -v  Verbose mode.";
    cout << "  -h  Print this help.";
+}
+
+
+string pname = NULL;
+bool verbose = false;
+
+
+void printv( std::initializer_list<string> texts ) {
+  if ( true == verbose ) {
+    for (const auto& s : texts) {
+      cout << pname << ": " << s << endl;
+    }
+  }
+}
+
+
+void printv() {} // Print verbose (varidic template)
+
+template<typename T, typename ... more_text>
+
+void printv( T first_text, more_text ... last_text ) {
+  if ( true == verbose ) {
+    cout << first_text;
+    printv( last_text ... );
+    cout << '\n';
+  }
 }
 
 /******************************************************************************
@@ -72,17 +100,16 @@ void get_message( zmqpp::socket *s, vector<string> *buff )
  * @brief   Connect to ZMQ socket, send message and listen to server answer.
  ******************************************************************************/
 
-const string version = VERSION;
-
-
 int main( int argc, char *args[] )
 {
-  int  rc = 0;           // return code assertion
-  int verbose = 0;
+  int rc             = 0; // return code assertion
+  verbose            = false;
+  pname              = args[0];
+  string endpoint    = "tcp://127.0.0.1:4242";
+  string stype       = "push";
 
-  const string pname    = args[0];
-  const string endpoint = args[1];
-  const string stype    = args[2];
+  if ( argc > 0 ) { stype = args[1]; }
+  if ( argc > 1 ) { endpoint = args[2]; }
   
   zmqpp::context context;
   zmqpp::socket_type type;
@@ -101,7 +128,7 @@ int main( int argc, char *args[] )
   if ( stype == "req"  ) { type = zmqpp::socket_type::req; }  else
   //if ( stype == "res"  ) { type = zmqpp::socket_type::res; } else
   {
-      cout << "Error: Unknown socket type!" << endl;
+      cout << "Error: Invalid socket type!" << endl;
       printhelp();
       return ( -2 );
   }
@@ -110,6 +137,7 @@ int main( int argc, char *args[] )
   socket.bind( endpoint );
   socket.connect( endpoint );
   socket_initialized = true;
+  printv( "Socket initialized (", type, "): ", endpoint );
 
   /****************************************************
    * @description    Compose a message from a string
@@ -156,13 +184,14 @@ int main( int argc, char *args[] )
   }
   ///@}
 
-  if ( socket_initialized )
+  if ( socket_initialized ) {
+    printv( "Closing socket (", type, "): ", endpoint );
     socket.close();
+  }
 
   thr_receive.join();
-  if ( verbose == 1 ) {
-    cout << "Terminating (" << rc << ")" << endl;
-  }
+
+  printv( "Terminating (", to_string(rc) );
 
   return rc;
 }
