@@ -6,6 +6,9 @@ GCC		= gcc
 CPP		= g++
 CXX      = $(CPP)
 
+SHELL := /bin/bash
+.SHELLFLAGS := -o pipefail -c
+
 # use common.c and common.h
 COMMON_LIB := libcommon.a
 COMMON_DIR := ./
@@ -22,7 +25,13 @@ RM		 = rm -f
 INC 	+= -I. -I$(COMMON_DIR) -I/usr/local/include
 
 CFLAGS		= $(INC) $(DOCTEST) -fmax-errors=4 -Wno-unused-result -Wno-unused-function
-CPPFLAGS	= $(INC) $(DOCTEST) -std=c++11 -g
+CPPFLAGS	= $(INC) $(DOCTEST) -std=c++11 -g \
+	-fno-diagnostics-show-caret \
+	-fno-diagnostics-show-template-tree \
+	-ftemplate-backtrace-limit=0 \
+	-fno-diagnostics-show-option \
+	-fmax-errors=2
+
 CXXFLAGS	= $(INC) $(DOCTEST) -std=c++11 -g
 
 # Paths
@@ -56,6 +65,6 @@ clean:
 ${TARGETS}:
 	@echo "Inheriting libraries $(LDFLAGS)"
 	@echo "Include path: $(INC)"
-	${CPP}  ${CPPFLAGS} -o $@ $< ${@:%=%.cpp} ${LDFLAGS} $(LDLIBS)
+	${CPP} ${CPPFLAGS} -o $@ $< ${@:%=%.cpp} ${LDFLAGS} $(LDLIBS) 2>&1 | sed '/: note:/d'
 
 

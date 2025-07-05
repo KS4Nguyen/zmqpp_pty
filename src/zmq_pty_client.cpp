@@ -1,5 +1,7 @@
 #include <iostream>
 #include <string>
+#include <initializer_list> // for printv()
+
 #include <assert.h>
 //#include <algorithm> // Required for std::sort
 #include "unistd.h"
@@ -20,6 +22,7 @@
 using namespace std;
 
 #define VERSION "0.0.2"
+#define DEBUG 1
 
 
 /******************************************************************************
@@ -43,16 +46,16 @@ void printhelp()
 string pname = NULL;
 bool verbose = false;
 
-
-void printv( std::initializer_list<string> texts ) {
+void printv( initializer_list<string> texts ) {
   if ( true == verbose ) {
     for (const auto& s : texts) {
-      cout << pname << ": " << s << endl;
+      cout << s;
     }
+    cout << '\n';
   }
 }
 
-
+/*
 void printv() {} // Print verbose (varidic template)
 
 template<typename T, typename ... more_text>
@@ -64,6 +67,7 @@ void printv( T first_text, more_text ... last_text ) {
     cout << '\n';
   }
 }
+*/
 
 /******************************************************************************
  * @name    receive()
@@ -103,7 +107,7 @@ void get_message( zmqpp::socket *s, vector<string> *buff )
 int main( int argc, char *args[] )
 {
   int rc             = 0; // return code assertion
-  verbose            = false;
+  verbose            = true;
   pname              = args[0];
   string endpoint    = "tcp://127.0.0.1:4242";
   string stype       = "push";
@@ -137,7 +141,8 @@ int main( int argc, char *args[] )
   socket.bind( endpoint );
   socket.connect( endpoint );
   socket_initialized = true;
-  printv( "Socket initialized (", type, "): ", endpoint );
+
+  printv( {"Socket initialized at ", endpoint} );
 
   /****************************************************
    * @description    Compose a message from a string
@@ -185,13 +190,13 @@ int main( int argc, char *args[] )
   ///@}
 
   if ( socket_initialized ) {
-    printv( "Closing socket (", type, "): ", endpoint );
+    printv( {"Closing socket at ", endpoint} );
     socket.close();
   }
 
   thr_receive.join();
 
-  printv( "Terminating (", to_string(rc) );
+  printv( {"Terminating (", to_string( rc )} );
 
   return rc;
 }
