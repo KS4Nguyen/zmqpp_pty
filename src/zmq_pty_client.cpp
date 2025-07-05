@@ -33,21 +33,21 @@ using namespace std;
 void printhelp()
 {
 
-   cout << "Usage: zmq_client <Socket-Type> <Endpoint> [Options]\n";
-   cout << "  Endpoint:    Format like tcp://127.0.0.1:4242";
-   cout << "  Socket-Type: One od the following:";
-   cout << "               pub, sub, push, pull, req, res";
-   cout << "  Options:";
-   cout << "  -v  Verbose mode.";
-   cout << "  -h  Print this help.";
+   cout << "Usage: zmq_client <Socket-Type> <Endpoint> [Options]\n" << endl;
+   cout << "  Endpoint:    Format tcp://127.0.0.1:4242" << endl;
+   cout << "  Socket-Type: One of the following:" << endl;
+   cout << "               pub, sub, push, pull, req, res" << endl;
+   cout << "  Options:" << endl;
+   cout << "  -v  Verbose mode." << endl;
+   cout << "  -h  Print this help." << endl;
 }
 
 
-string pname = NULL;
+string pname = "none";
 bool verbose = false;
 
 void printv( initializer_list<string> texts ) {
-  if ( true == verbose ) {
+  if ( verbose == true ) {
     for (const auto& s : texts) {
       cout << s;
     }
@@ -80,17 +80,17 @@ void printv( T first_text, more_text ... last_text ) {
 atomic<int> new_msg (0);
 mutex mtx_get_message; // mutex for all resourcrs shared with recept()
 
-void get_message( zmqpp::socket *s, vector<string> *buff )
+void get_message( zmqpp::socket &s, vector<string> &buff )
 {
   zmqpp::message rx_msg;
-  string *string_msg;
+  string *string_msg = NULL;
   string_msg = (string*)&rx_msg; // TODO Check if this is a safe type conversion.
 
-  while ( NULL != s ) {
-    if ( true == s->receive(rx_msg, false) ) { // TODO lock socket aka *s.
+  while ( NULL != &s ) { // TODO Better test if socket is not closed.
+    if ( true == s.receive(rx_msg, false) ) { // TODO lock socket aka *s.
       mtx_get_message.lock();
       //lock_guard<std::mutex> lock( mtx_get_message );
-        buff->push_back( *string_msg );
+        buff.push_back( *string_msg );
         new_msg++;
       mtx_get_message.unlock();
       //lock_guard<std::mutex> unlock( mtx_get_message);
@@ -104,17 +104,18 @@ void get_message( zmqpp::socket *s, vector<string> *buff )
  * @brief   Connect to ZMQ socket, send message and listen to server answer.
  ******************************************************************************/
 
-int main( int argc, char *args[] )
+int main( int argc, char **argv )
 {
   int rc             = 0; // return code assertion
   verbose            = true;
-  pname              = args[0];
+  pname              = argv[0];
   string endpoint    = "tcp://127.0.0.1:4242";
   string stype       = "push";
 
-  if ( argc > 0 ) { stype = args[1]; }
-  if ( argc > 1 ) { endpoint = args[2]; }
-  
+  if ( argc > 1 ) { stype = argv[1]; }
+  if ( argc > 2 ) { endpoint = argv[2]; }
+  printv( {pname, " v", VERSION} );
+
   zmqpp::context context;
   zmqpp::socket_type type;
   bool socket_initialized = false;
@@ -162,9 +163,9 @@ int main( int argc, char *args[] )
   ///@{
 
   std::thread thr_receive(
-      get_message,      // void(*)(socket*, vector*)
-      &socket,          // zmqpp::socket*
-      &rx_buff          // std::vector<std::string>*
+      get_message,        // void(*)(socket*, vector*)
+      std::ref( socket ), // Reference to zmqpp::socket
+      std::ref( rx_buff ) // Reference to std::vector<std::string>
   );
 
   //thr_receive.detach();
