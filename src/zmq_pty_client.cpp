@@ -18,12 +18,13 @@
 
 #include <atomic>
 
+#define VERSION          "0.0.2"
+
+#define DEBUG            1
+#define SUPPORT_RAW_DATA 0
+
 
 using namespace std;
-
-#define VERSION "0.0.2"
-#define DEBUG 1
-
 
 /******************************************************************************
  * @name    printhelp()
@@ -81,6 +82,8 @@ void printv( T first_text, more_text ... last_text ) {
 }
 */
 
+///@}
+
 /******************************************************************************
  * @name    receive()
  * @brief   Receive ZMQ message, thread.
@@ -109,18 +112,26 @@ void get_message( zmqpp::socket &s, vector<string> &buff )
     }
   }
 }
- ///@}
+///@}
+
 
 /******************************************************************************
  * @name    main()
  * @brief   Connect to ZMQ socket, send message and listen to server answer.
  ******************************************************************************/
 
+///@{
 int main( int argc, char **argv )
 {
   int rc             = 0; // return code assertion
   verbose            = true;
   pname              = argv[0];
+
+  /****************************************************
+   * @description    Prepare socket.
+   ****************************************************/
+
+  ///@{
   string endpoint    = "tcp://127.0.0.1:4242";
   string stype       = "push";
 
@@ -131,12 +142,6 @@ int main( int argc, char **argv )
   zmqpp::context context;
   zmqpp::socket_type type;
   bool socket_initialized = false;
-  
-  vector<string> rx_buff;
-
-  zmqpp::message tx_msg;  // send message
-  string *tx_msg_string;
-  tx_msg_string = (string*)&tx_msg;
 
   if ( stype == "pub"  ) { type = zmqpp::socket_type::pub; }  else
   if ( stype == "sub"  ) { type = zmqpp::socket_type::sub; }  else
@@ -156,20 +161,28 @@ int main( int argc, char **argv )
   socket_initialized = true;
 
   printv( {"Socket initialized at ", endpoint} );
-
-  /****************************************************
-   * @description    Compose a message from a string
-   ****************************************************/
-
-  ///@{
-
-  //int number
-  //rx_buff >> text >> number;
-
   ///@}
 
   /****************************************************
-   * @description    Listen to socket till abort
+   * @description    Initialize RX-Buffer.
+   ****************************************************/
+
+  ///@[
+  vector<string> rx_buff;
+  ///@}
+
+  /****************************************************
+   * @description    Initialize TX-Message
+   ****************************************************/
+
+  ///@{
+  zmqpp::message tx_msg;
+  string *tx_msg_string;
+  tx_msg_string = (string*)&tx_msg; // TODO Use zmqpp::message::add_raw()
+  ///@}
+
+  /****************************************************
+   * @description    Listen to socket and reply.
    ****************************************************/
 
   ///@{
@@ -193,17 +206,27 @@ int main( int argc, char **argv )
         rx_buff.pop_back();
         new_msg--;
 
-        // TODO Make buffer a FIFO:
-        //std::sort( rx_buff.begin(), rx_buff.end() );
+        /**
+         * @note	TODO Use bufer as FIFO or create FIFO class.
+         *			std::sort( rx_buff.begin(), rx_buff.end() );
+         */
 
         mtx_get_message.unlock();
       }
     }
+
+    // Read terminal file descripter input
     std::getline( cin, *tx_msg_string);
+
+    // Prepare ZMQ message raw-data
+    //tx_msg.add_raw( tx_msg_string, sizeof( *tx_msg_string );
+
+    // Send ZMQ message on socket
     socket.send( tx_msg );
   }
   ///@}
 
+  // TODO Implement abort condition/signal.
   if ( socket_initialized ) {
     printv( {"Closing socket at ", endpoint} );
     socket.close();
@@ -215,6 +238,8 @@ int main( int argc, char **argv )
 
   return rc;
 }
+///@}
+
 
 /**
  * @TODO  Replace send() & receive() with raw data handling
