@@ -55,6 +55,18 @@ void printv( initializer_list<string> texts ) {
   }
 }
 
+void printd( initializer_list<string> texts ) {
+  #ifdef DEBUG
+   #if ( DEBUG == true )
+      for (const auto& s : texts) {
+        cout << s;
+      }
+      cout << '\n';
+      #endif
+  #endif
+     ;
+}
+
 /*
 void printv() {} // Print verbose (varidic template)
 
@@ -86,7 +98,7 @@ void get_message( zmqpp::socket &s, vector<string> &buff )
   string *string_msg = NULL;
   string_msg = (string*)&rx_msg; // TODO Check if this is a safe type conversion.
 
-  while ( NULL != &s ) { // TODO Better test if socket is not closed.
+  while ( s ) {
     if ( true == s.receive(rx_msg, false) ) { // TODO lock socket aka *s.
       mtx_get_message.lock();
       //lock_guard<std::mutex> lock( mtx_get_message );
@@ -161,15 +173,17 @@ int main( int argc, char **argv )
    ****************************************************/
 
   ///@{
-
-  std::thread thr_receive(
-      get_message,        // void(*)(socket*, vector*)
-      std::ref( socket ), // Reference to zmqpp::socket
-      std::ref( rx_buff ) // Reference to std::vector<std::string>
-  );
-
-  //thr_receive.detach();
-  
+   #if( DEBUG == 1 )
+     get_message( std::ref( socket ), std::ref( rx_buff ) );
+   #else
+     std::thread thr_receive(
+       get_message,        // void(*)(socket*, vector*)
+       std::ref( socket ), // Reference to zmqpp::socket
+       std::ref( rx_buff ) // Reference to std::vector<std::string>
+     );
+     //thr_receive.detach();
+   #endif
+   
   while ( 1 ) {
     if ( new_msg > 0 ) {
       if ( mtx_get_message.try_lock() ) {
@@ -217,3 +231,26 @@ int main( int argc, char **argv )
   )
 
 */
+
+string get_socket_endpoint( zmq::socket socket )
+{
+   std::string ep;
+   size_t len = 256;
+   ep.resize(len);
+   socket.getsockopt(ZMQ_LAST_ENDPOINT, ep.data(), &len);
+   ep.resize(len);
+   //wenn ep leer oder ungewünscht → keine aktive Verbindung
+   return( ep );
+}
+
+/*
+using SocketPtr = std::shared_ptr<zmq::socket_t>;
+
+void worker(SocketPtr sock) {
+  if (!sock) return;  // ungültig
+  …
+}
+*/
+
+auto socket = std::make_shared<zmq::socket_t>(ctx, zmq::socket_type::dealer);
+std::thread t(worker, socket);
