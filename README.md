@@ -5,48 +5,42 @@ libzmq:
 
 	(ref. A) https://github.com/zeromq/zmqpp
 
-In addition the **zmq_pty_client** and **zmq_pty_server** generate a PTY device
+In this fork, the **zmq_pty_client** and **zmq_pty_server** generate a PTY device
 in the Linux userspace:
 
 	/dev/ttyz0
 	/dev/ttyz1
-
-## Command-Line Client
-
-**Not finished yet.**
-
-	build/zmq_pty_client
-
-The ZMQPP client is built on top of the libzmqpp bindings:
-
-	build/<arch>/zmqpp
-
-## Command-Line Server
-
-**Not finished yet.**
-
-build/zmq_pty_server
 
 
 # Installation
 
 C++11 compliant compiler is needed (g++ >= 4.7).
 
+
+1) __Install Dependencies__
+
 You can install the additional requirements with the installation scripts
 located at:
 
 	scripts/
+	|__ ./install_libboost.sh
+	|__ ./install_zmq_with_libsodium.sh
+		|__ libzmq.a
+		|__ libzmq.so ...will be installed to /usr/local/lib
 
-Install dependencies:
 
-	./install_libboost.sh
-	./install_zmq_with_libsodium.sh
+2) __Install ZMQPP__
 
-Install:
+The ZMQPP client is built on top of the libzmqpp bindings:
 
-	make all
-	make pty
+	make test
 	sudo make install
+	|__libzmqpp.a
+	|__libzmqpp.so ...will also be installed to /usr/local/lib
+
+
+"The install process will only install headers and the shared object to the
+system. The archive will remain in the build directory." (ref. A)
 
 "If the boost unittest framework is installed, check and installcheck can be run
 for sanity checking. " (ref. A):
@@ -55,28 +49,10 @@ for sanity checking. " (ref. A):
 	sudo make installcheck
 
 
-## libzmqpp
+3) __ZMQPP PTY Command-Line Client/Server__
 
-__ZMQPP__
-
-libzmqpp.a
-libzmqpp.so
-
-...will be installed to:
-
-	/usr/local/lib
-
-"The install process will only install headers and the shared object to the
-system. The archive will remain in the build directory." (ref. A)
-
-__ZMQ__
-
-libzmq.a
-libzmq.so
-
-...will be installed to:
-
-	/usr/local/lib
+	cd src/
+	make all
 
 
 # Documentation
@@ -94,9 +70,9 @@ And the resulting html [...]" can be found at:
 	docs/html/index.html
 
 
-## Development Notes
+# Development Notes
 
-1) Update with latest changes from ZMQPP:
+1) Update with latest changes from ZMQPP repository:
 
 	./sync_fork.h
 

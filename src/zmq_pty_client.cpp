@@ -9,13 +9,8 @@
 #include <zmqpp/zmqpp.hpp>
 //#include "options.hpp"
 
-#ifndef BUILD_CLIENT_NAME
-  #define BUILD_CLIENT_NAME "zmqpp_pty_client"
-#endif
-
 #include <thread>
 #include <mutex>
-
 #include <atomic>
 
 #define VERSION          "0.0.2"
@@ -26,35 +21,6 @@
 
 using namespace std;
 
-/******************************************************************************
- * @name    printhelp()
- * @brief   Usage of the program.
- ******************************************************************************/
-
-void printhelp()
-{
-
-   cout << "Usage: zmq_client <Socket-Type> <Endpoint> [Options]\n" << endl;
-   cout << "  Endpoint:    Format tcp://127.0.0.1:4242" << endl;
-   cout << "  Socket-Type: One of the following:" << endl;
-   cout << "               pub, sub, push, pull, req, res" << endl;
-   cout << "  Options:" << endl;
-   cout << "  -v  Verbose mode." << endl;
-   cout << "  -h  Print this help." << endl;
-}
-
-
-string pname = "none";
-bool verbose = false;
-
-void printv( initializer_list<string> texts ) {
-  if ( verbose == true ) {
-    for (const auto& s : texts) {
-      cout << s;
-    }
-    cout << '\n';
-  }
-}
 
 void printd( initializer_list<string> texts ) {
   #ifdef DEBUG
@@ -66,6 +32,46 @@ void printd( initializer_list<string> texts ) {
       #endif
   #endif
      ;
+}
+
+
+/******************************************************************************
+ * @name    printhelp()
+ * @brief   Usage of the program.
+ ******************************************************************************/
+
+///@{
+void printhelp()
+{
+
+   cout << "Usage: zmq_client <Socket-Type> <Endpoint> [Options]\n" << endl;
+   cout << "  Endpoint:    Format tcp://127.0.0.1:4242" << endl;
+   cout << "  Socket-Type: One of the following:" << endl;
+   cout << "               pub, sub, push, pull, req, res" << endl;
+   cout << "  Options:" << endl;
+   cout << "  -v  Verbose mode." << endl;
+   cout << "  -h  Print this help." << endl;
+}
+///@}
+
+
+/******************************************************************************
+ * @name    printv()
+ * @brief   Verbose print when 'verbose' is 'true'.
+ ******************************************************************************/
+
+///@{
+string pname = "none";
+bool verbose = false;
+
+void printv( initializer_list<string> texts )
+{
+  if ( verbose == true ) {
+    for (const auto& s : texts) {
+      cout << s;
+    }
+    cout << '\n';
+  }
 }
 
 /*
@@ -81,11 +87,32 @@ void printv( T first_text, more_text ... last_text ) {
   }
 }
 */
-
 ///@}
 
+
+/**
+ * @name    get_socket_endpoint()
+ * @brief   Can be used to check if socket is connected.
+ * @return  int64_t endpoint. When 0 no active socket connection.
+ */
+int64_t get_endpoint( zmqpp::socket socket )
+{
+   int64_t ep = 0;
+   //string ep;
+   //size_t len;
+
+   socket.get( zmqpp::socket_option::last_endpoint, ep );
+   //ep.resize(len);
+   //socket.getsockopt(ZMQ_LAST_ENDPOINT, ep.data(), &len);
+   //ep.resize(len);
+
+   // TODO Convert int64_t endpoiint to string aka "x.x.x.x" address.
+   return( ep );
+}
+
+
 /******************************************************************************
- * @name    receive()
+ * @name    poll_messages()
  * @brief   Receive ZMQ message, thread.
  * @param   *s      Pointer to ZMQ socket, where to grab incomming messages.
  * @param   *buff   Pointer to messae buffer.
@@ -93,22 +120,24 @@ void printv( T first_text, more_text ... last_text ) {
 
 ///@{
 atomic<int> new_msg (0);
-mutex mtx_get_message; // mutex for all resourcrs shared with recept()
+mutex mtx_poll_messages; // mutex for all resourcrs shared with recept()
 
-void get_message( zmqpp::socket &s, vector<string> &buff )
+void poll_messages( zmqpp::socket &s, vector<string> &buff )
 {
   zmqpp::message rx_msg;
   string *string_msg = NULL;
   string_msg = (string*)&rx_msg; // TODO Check if this is a safe type conversion.
+  //printd( "Start polling for messages." );
 
   while ( s ) {
+    // FIXME This line throws!!!
     if ( true == s.receive(rx_msg, false) ) { // TODO lock socket aka *s.
-      mtx_get_message.lock();
-      //lock_guard<std::mutex> lock( mtx_get_message );
+      mtx_poll_messages.lock();
+      //lock_guard<std::mutex> lock( mtx_poll_messages );
         buff.push_back( *string_msg );
         new_msg++;
-      mtx_get_message.unlock();
-      //lock_guard<std::mutex> unlock( mtx_get_message);
+      mtx_poll_messages.unlock();
+      //lock_guard<std::mutex> unlock( mtx_poll_messages);
     }
   }
 }
@@ -156,41 +185,36 @@ int main( int argc, char **argv )
   }
   
   zmqpp::socket socket( context, type );
+  //using socket_ptr = std::shared_ptr<zmqpp::socket_t>;
+  zmqpp::socket *socket_ptr = &socket;
+
   socket.bind( endpoint );
   socket.connect( endpoint );
-  socket_initialized = true;
 
-  printv( {"Socket initialized at ", endpoint} );
+  if ( socket_ptr ) {
+    socket_initialized = true;
+    printv( {"Socket initialized at ", endpoint} );
+  } else {
+    cout << "Error: Could not bind to socket " << endpoint << endl;
+    return ( -1 );
+  }
   ///@}
 
-  /****************************************************
-   * @description    Initialize RX-Buffer.
-   ****************************************************/
-
-  ///@[
+  // Initialize RX-Buffer.
   vector<string> rx_buff;
-  ///@}
 
-  /****************************************************
-   * @description    Initialize TX-Message
-   ****************************************************/
-
-  ///@{
+  // Initialize TX-Message
   zmqpp::message tx_msg;
   string *tx_msg_string;
   tx_msg_string = (string*)&tx_msg; // TODO Use zmqpp::message::add_raw()
-  ///@}
 
-  /****************************************************
-   * @description    Listen to socket and reply.
-   ****************************************************/
-
+  // Listen to socket and reply.
   ///@{
    #if( DEBUG == 1 )
-     get_message( std::ref( socket ), std::ref( rx_buff ) );
+     poll_messages( *socket_ptr, ref( rx_buff ) );
    #else
      std::thread thr_receive(
-       get_message,        // void(*)(socket*, vector*)
+       poll_messages,        // void(*)(socket*, vector*)
        std::ref( socket ), // Reference to zmqpp::socket
        std::ref( rx_buff ) // Reference to std::vector<std::string>
      );
@@ -199,7 +223,7 @@ int main( int argc, char **argv )
    
   while ( 1 ) {
     if ( new_msg > 0 ) {
-      if ( mtx_get_message.try_lock() ) {
+      if ( mtx_poll_messages.try_lock() ) {
         cout << rx_buff[new_msg-1] << endl;
 
         // Discard latest message
@@ -211,7 +235,7 @@ int main( int argc, char **argv )
          *			std::sort( rx_buff.begin(), rx_buff.end() );
          */
 
-        mtx_get_message.unlock();
+        mtx_poll_messages.unlock();
       }
     }
 
@@ -232,7 +256,9 @@ int main( int argc, char **argv )
     socket.close();
   }
 
-  thr_receive.join();
+  #if( DEBUG < 1 )
+    thr_receive.join();
+  #endif
 
   printv( {"Terminating (", to_string( rc )} );
 
@@ -256,26 +282,3 @@ int main( int argc, char **argv )
   )
 
 */
-
-string get_socket_endpoint( zmq::socket socket )
-{
-   std::string ep;
-   size_t len = 256;
-   ep.resize(len);
-   socket.getsockopt(ZMQ_LAST_ENDPOINT, ep.data(), &len);
-   ep.resize(len);
-   //wenn ep leer oder ungewünscht → keine aktive Verbindung
-   return( ep );
-}
-
-/*
-using SocketPtr = std::shared_ptr<zmq::socket_t>;
-
-void worker(SocketPtr sock) {
-  if (!sock) return;  // ungültig
-  …
-}
-*/
-
-auto socket = std::make_shared<zmq::socket_t>(ctx, zmq::socket_type::dealer);
-std::thread t(worker, socket);

@@ -65,6 +65,9 @@ clean:
 ${TARGETS}:
 	@echo "Inheriting libraries $(LDFLAGS)"
 	@echo "Include path: $(INC)"
-	${CPP} ${CPPFLAGS} -o $@ $< ${@:%=%.cpp} ${LDFLAGS} $(LDLIBS) 2>&1 | sed '/: note:/d'
+	${CPP} ${CPPFLAGS} -o $@ $< ${@:%=%.cpp} ${LDFLAGS} $(LDLIBS) 2>&1 \
+	| sed '/: note:/d' # | grep --color=always -E 'error'
+
+
 
 
