@@ -12,11 +12,12 @@
 #include <thread>
 #include <mutex>
 #include <atomic>
+#include <chrono>
 
 #define VERSION          "0.0.2"
 
 #define DEBUG            1
-#define SUPPORT_RAW_DATA 0
+#define SUPPORT_RAW_DATA 1
 
 
 using namespace std;
@@ -126,43 +127,52 @@ mutex mtx_poll_messages; // mutex for all resourcrs shared with recept()
 
 void poll_messages( zmqpp::socket& s, vector<string> &buff )
 {
-  size_t msg_size;
-  char   msg_buff[RX_SIZE];
   string msg_str;
+  #if( SUPPORT_RAW_DATA == 1 )
+    char   msg_buff[RX_SIZE];
+  #endif
+  size_t msg_size;
 
   while ( s ) {
-    try {
-      cout << "TEST1" << endl;
-      //zmqpp::recv( socket, message );
-      s.receive_raw( &msg_buff[0], msg_size, 0 );
-      cout << "msg_buff[] size (" << msg_size << ")" << endl;
-    }
-    catch ( const std::exception& e ) {
+    #if( SUPPORT_RAW_DATA == 1 )
+      try {
+        cout << "poll_message() Waiting for message." << endl;
+        //zmqpp::recv( socket, message );
+        s.receive_raw( &msg_buff[0], msg_size, 0 );
+        cout << "msg_buff[] size (" << msg_size << ")" << endl;
+      }
+      catch ( const std::exception& e ) {
         // Defauit exception handler
         std::cerr << "poll_message() Exception: " << e.what() << '\n';
         break;
-    }
-    catch (...) {
+      }
+      catch (...) {
         // Catch what() exceptions
         std::cerr << "poll_message() Unknown exception!\n";
         break;
-    }
+      }
+    
+      msg_str = msg_buff;
+      msg_size = sizeof( msg_str );
+    
+      // Empty buffer
+      for ( size_t i=0; i<msg_size; i++ ) {
+        	msg_buff[i] = '\0';
+      }
+    
+    #else
+      zmqpp::message message;
+      socket.receive( message );
 
-    cout << "TEST2" << endl;
-
-    msg_str = msg_buff;
-    msg_size = sizeof( msg_str );
-
-    cout << "TEST3" << endl;
-
-    // Empty buffer
-    for ( size_t i=0; i<msg_size; i++ ) {
-    	msg_buff[i] = '\0';
-    }
-
+      // Read as a string
+      message >> msg_str;
+    #endif
+    
     if ( msg_size > 0 ) {
-      //rx_msg >> msg_str;
-      cout << "msg_str (" << msg_str << ") size (" << msg_size << ")" << endl;
+      #if( DEBUG == 1 )
+        cout << "msg_str (" << msg_str << ") size (" << msg_size << ")" << endl;
+      #endif
+      
       mtx_poll_messages.lock();
       //lock_guard<std::mutex> lock( mtx_poll_messages );
         buff.push_back( msg_str );
@@ -219,8 +229,8 @@ int main( int argc, char **argv )
   zmqpp::socket socket( context, type );
   zmqpp::socket *socket_ptr = &socket;
 
-  //socket.bind( endpoint );
-  socket.connect( endpoint );
+  socket.bind( endpoint );
+  //socket.connect( endpoint );
 
   if ( socket_ptr ) {
     socket_initialized = true;
@@ -239,6 +249,8 @@ int main( int argc, char **argv )
   string *tx_msg_string;
   tx_msg_string = (string*)&tx_msg; // TODO Use zmqpp::message::add_raw()
 
+  this_thread::sleep_for( chrono::milliseconds(1000) );
+  
   // Listen to socket and reply.
   ///@{
    #if( DEBUG == 1 )
