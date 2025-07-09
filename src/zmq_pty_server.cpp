@@ -20,7 +20,7 @@ using namespace std;
 const string version = VERSION;
 
 int main(int argc, char *argv[]) {
-  const string endpoint = "tcp://127.0.0.1:4242";
+  const string endpoint = "tcp://*:4242";
   int major, minor, patch;
   string zmqver;
   
@@ -47,11 +47,12 @@ int main(int argc, char *argv[]) {
   zmqpp::context context;
 
   // generate a pull socket
-  zmqpp::socket_type type = zmqpp::socket_type::reply;
+  zmqpp::socket_type type = zmqpp::socket_type::pull;
   zmqpp::socket socket (context, type);
 
   // bind to the socket
-  socket.bind(endpoint);
+  socket.bind( endpoint );
+
   string text;
 
   while (1) {
