@@ -209,29 +209,29 @@ int main( int argc, char **argv )
 
   if ( argc > 1 ) { stype = argv[1]; }
   if ( argc > 2 ) { endpoint = argv[2]; }
+
   printv( {pname, " v", VERSION} );
 
-  zmqpp::context context;
-  zmqpp::socket_type type;
-
   bool socket_initialized = false;
+  zmqpp::socket_type type;
+  zmqpp::context context;
 
-  if ( stype == "pub"  ) { type = zmqpp::socket_type::pub; }  else
-  if ( stype == "sub"  ) { type = zmqpp::socket_type::sub; }  else
-  if ( stype == "push" ) { type = zmqpp::socket_type::push; } else
-  if ( stype == "pull" ) { type = zmqpp::socket_type::pull; } else
-  if ( stype == "pair" ) { type = zmqpp::socket_type::req; }  else
-  //if ( stype == "res"  ) { type = zmqpp::socket_type::res; } else
+  if ( stype == "pub"  ) { type = zmqpp::socket_type::publish; }   else
+  if ( stype == "sub"  ) { type = zmqpp::socket_type::subscribe; } else
+  if ( stype == "push" ) { type = zmqpp::socket_type::push; }      else
+  if ( stype == "pull" ) { type = zmqpp::socket_type::pull; }      else
+  if ( stype == "req"  ) { type = zmqpp::socket_type::request; }   else
   {
-      cout << "Error: Invalid socket type!" << endl;
+      cout << "Error: Unknown socket type!" << endl;
       printhelp();
-      return ( -2 );
+      return ( EXIT_FAILURE );
   }
   
   zmqpp::socket socket( context, type );
   zmqpp::socket *socket_ptr = &socket;
+  if ( type == zmqpp::socket_type::subscribe ) { socket.subscribe( "" ); }
 
-  socket.bind( endpoint );
+  socket.bind( endpoint ); // TODO Check if "bind" is allowed to all s-types!
   socket.connect( endpoint );
 
   if ( socket_ptr ) {
