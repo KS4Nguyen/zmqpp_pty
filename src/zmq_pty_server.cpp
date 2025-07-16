@@ -64,7 +64,7 @@ int main(int argc, char *argv[]) {
     message >> text;
 
     //Do some 'work'
-    this_thread::sleep_for(chrono::seconds(1));
+    this_thread::sleep_for(chrono::milliseconds(20));
     cout << text << endl;
     socket.send("End.\n");
   }

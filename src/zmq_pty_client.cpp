@@ -23,6 +23,42 @@
 using namespace std;
 
 
+/******************************************************************************
+ * @name  length_to_null()
+ * @brief Find the first NULL in a string,
+ *        Indeed each string is NULL terminated.
+ * @note  '\0' (Hex-0, ASCII 00).
+ ******************************************************************************/
+
+size_t length_to_null( const std::string& s ) {
+  size_t i = 0;
+  while ( i < s.size() && s[i] != '\0' ) {
+    i++;
+  }
+  return i;
+}
+
+
+/******************************************************************************
+ * @name  length_to_lf()
+ * @brief Find a linefeed in a string, if existing. If none is in there, return
+ *        the string length itself.
+ * @note  '\n' is the linefeed (LF, ASCII 10).
+ *        By the way, get an ASCII code of a character with:
+ *
+ *        char c = '\0';
+ *        int code = static_cast<unsigned char>(c);  // code == 0
+ ******************************************************************************/
+
+size_t length_to_lf( const std::string& s ) {
+  size_t i = 0;
+  while ( i < s.size() && s[i] != '\n' ) {
+    i++;
+  }
+  return i;
+}
+
+
 void printd( initializer_list<string> texts ) {
   #ifdef DEBUG
     #if ( DEBUG == true )
@@ -41,19 +77,17 @@ void printd( initializer_list<string> texts ) {
  * @brief   Usage of the program.
  ******************************************************************************/
 
-///@{
 void printhelp()
 {
 
-   cout << "Usage: zmq_client <Socket-Type> <Endpoint> [Options]\n";
-   cout << "  Endpoint:    Format tcp://127.0.0.1:4242 (default endpoint)\n";
+   cout << "Usage: zmq_client <Socket-Type> <Endpoint> [Options]\n\n";
+   cout << "  Endpoint:    Format tcp://127.0.0.1:4242 (default endpoint)\n\n";
    cout << "  Socket-Type: One of the following:\n";
-   cout << "               pub, sub, push, pull, pair\n";
+   cout << "               pub, sub, push, pull, pair\n\n";
    cout << "  Options:\n";
    cout << "  -v  Verbose mode.\n";
    cout << "  -h  Print this help.\n";
 }
-///@}
 
 
 /******************************************************************************
@@ -74,28 +108,15 @@ void printv( initializer_list<string> texts )
     cout << '\n';
   }
 }
-
-/*
-void printv() {} // Print verbose (varidic template)
-
-template<typename T, typename ... more_text>
-
-void printv( T first_text, more_text ... last_text ) {
-  if ( true == verbose ) {
-    cout << first_text;
-    printv( last_text ... );
-    cout << '\n';
-  }
-}
-*/
 ///@}
 
 
-/**
+/******************************************************************************
  * @name    get_socket_endpoint()
  * @brief   Can be used to check if socket is connected.
  * @return  int64_t endpoint. When 0 no active socket connection.
- */
+ ******************************************************************************/
+
 int64_t get_endpoint( zmqpp::socket socket )
 {
    int64_t ep = 0;
@@ -120,32 +141,36 @@ int64_t get_endpoint( zmqpp::socket socket )
  ******************************************************************************/
 
 ///@{
-#define RX_SIZE 512
+#define RX_SIZE 1024
 
 atomic<int> new_msg (0);
 mutex mtx_poll_messages; // mutex for all resourcrs shared with recept()
 
-void poll_messages( zmqpp::socket& s, vector<string> &buff, bool standardin )
+void poll_messages( zmqpp::socket& s, vector<string> &buff, bool stdin )
 {
   string msg_str;
-  size_t msg_size;
+  size_t msg_size = 0;
 
   zmqpp::poller poller;
   poller.add( s );
   const bool can_send = true;
-  if( true == standardin ) { poller.add( 1 ); }
+  if( true == stdin ) { poller.add( 1 ); }
 
   #if( SUPPORT_RAW_DATA == 1 )
     char msg_buff[RX_SIZE];
-    memset( msg_buff, 0, sizeof(RX_SIZE) );  // Vorab nullen – gute Praxis
+    memset( msg_buff, 0, RX_SIZE );  // Ensure nulls
+  #else
+    zmqpp::message msg_zmq;
   #endif
 
   while ( s ) {
-    poller.check_for( s, ( standardin ) ? zmqpp::poller::poll_in : zmqpp::poller::poll_none );
-      if( standardin == true )
-      {
-        poller.check_for( standardin, (can_send) ? zmqpp::poller::poll_in : zmqpp::poller::poll_none );
-      }
+    poller.check_for( s, ( stdin ) ? zmqpp::poller::poll_in : zmqpp::poller::poll_none );
+
+    if( stdin == true )
+    {
+      poller.check_for( stdin, ( can_send ) ? zmqpp::poller::poll_in : zmqpp::poller::poll_none );
+    }
+
     if ( poller.poll() ) {
       #if( SUPPORT_RAW_DATA == 1 )
         try {
@@ -167,22 +192,29 @@ void poll_messages( zmqpp::socket& s, vector<string> &buff, bool standardin )
           break;
         }
 
-        msg_str = msg_buff; // TODO Check \0 termination
-        //std::string msg_str( msg_buff, msg_size ); // Copy only valid bytes
-        msg_size = sizeof( msg_str );
+        msg_str = msg_buff;
 
-        // Empty buffer
-        for ( size_t i=0; i<msg_size; i++ ) {
-            msg_buff[i] = '\0';
+        // Determine message size
+        msg_size = 0;
+        while ( msg_size < RX_SIZE ) {
+          if ( msg_buff[msg_size] == '\0' ) { break; }
         }
 
+        // Empty buffer again
+        memset( msg_buff, 0, RX_SIZE );
+
       #else
-        zmqpp::message msg_zmq;
         s.receive( msg_zmq, true );
 
         // Read as a string
         msg_zmq >> msg_str;
-        msg_size = sizeof( msg_str );
+
+        // @note:
+        // In c++ there are
+        // (1)  C-Strings (arrays of char, null-terminated)
+        // (2)  std::string (abstract container, keeps-track of the length)
+        msg_size = length_to_null( msg_str );
+        cout << "[" << msg_size << "]" << msg_str << endl;
       #endif
 
       if ( msg_size > 0 ) {
@@ -212,11 +244,6 @@ int main( int argc, char **argv )
   verbose            = true;
   pname              = argv[0];
 
-  /****************************************************
-   * @description    Prepare socket.
-   ****************************************************/
-
-  ///@{
   string endpoint    = "tcp://localhost:4242";
   string stype       = "push";
 
@@ -233,18 +260,20 @@ int main( int argc, char **argv )
   if ( stype == "sub"  ) { type = zmqpp::socket_type::subscribe; } else
   if ( stype == "push" ) { type = zmqpp::socket_type::push; }      else
   if ( stype == "pull" ) { type = zmqpp::socket_type::pull; }      else
-  if ( stype == "req"  ) { type = zmqpp::socket_type::request; }   else
+  if ( stype == "pair" ) { type = zmqpp::socket_type::pair; }      else
   {
       cout << "Error: Unknown socket type!" << endl;
       printhelp();
-      return ( EXIT_FAILURE );
+      return ( -1 );
   }
 
+  // Prepare socket
   zmqpp::socket socket( context, type );
   zmqpp::socket *socket_ptr = &socket;
   if ( type == zmqpp::socket_type::subscribe ) { socket.subscribe( "" ); }
+  if ( type == zmqpp::socket_type::pull ) { socket.bind( endpoint ); }
+  // TODO Check if "bind" is allowed to all s-types!
 
-  //socket.bind( endpoint ); // TODO Check if "bind" is allowed to all s-types!
   socket.connect( endpoint );
 
   if ( socket_ptr ) {
@@ -254,7 +283,6 @@ int main( int argc, char **argv )
     cout << "Error: Could not connect to socket " << endpoint << endl;
     return ( -1 );
   }
-  ///@}
 
   // Initialize RX-Buffer.
   vector<string> rx_buff;
@@ -265,8 +293,7 @@ int main( int argc, char **argv )
 
   this_thread::sleep_for( chrono::milliseconds(100) );
   
-  // Listen to socket and reply.
-  ///@{
+  // Listen to socket and reply
   #if( DEBUG == 1 )
     poll_messages( *socket_ptr, ref(rx_buff), true );
   #else
@@ -289,7 +316,7 @@ int main( int argc, char **argv )
 
         /**
          * @note	TODO Use bufer as FIFO or create FIFO class.
-         *			std::sort( rx_buff.begin(), rx_buff.end() );
+         *			  std::sort( rx_buff.begin(), rx_buff.end() );
          */
 
         mtx_poll_messages.unlock();
@@ -307,7 +334,6 @@ int main( int argc, char **argv )
     socket.send( tx_msg );
 
   }
-  ///@}
 
   // TODO Implement abort condition/signal.
   if ( socket_initialized ) {
