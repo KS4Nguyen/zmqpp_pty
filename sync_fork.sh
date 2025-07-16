@@ -17,7 +17,7 @@ fi
 # ZMQPP     upstream	https://github.com/zeromq/zmqpp.git (fetch)
 
 git fetch upstream
-#git checkout <feature> # if you want to update from a feature-branch
+git checkout upstream/master
 
 
 ##############################################################
@@ -29,7 +29,7 @@ git add .
 git commit -m "Updating the latest ZMQPP from $UPSTREAM"
 
 # Merge latest changes from ZMQPP into local work
-#git merge upstream/master
+git merge upstream/master
 
 git push origin
 
