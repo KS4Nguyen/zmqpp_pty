@@ -112,28 +112,6 @@ void printv( initializer_list<string> texts )
 
 
 /******************************************************************************
- * @name    get_socket_endpoint()
- * @brief   Can be used to check if socket is connected.
- * @return  int64_t endpoint. When 0 no active socket connection.
- ******************************************************************************/
-
-int64_t get_endpoint( zmqpp::socket socket )
-{
-   int64_t ep = 0;
-   //string ep;
-   //size_t len;
-
-   socket.get( zmqpp::socket_option::last_endpoint, ep );
-   //ep.resize(len);
-   //socket.getsockopt(ZMQ_LAST_ENDPOINT, ep.data(), &len);
-   //ep.resize(len);
-
-   // TODO Convert int64_t endpoiint to string aka "x.x.x.x" address.
-   return( ep );
-}
-
-
-/******************************************************************************
  * @name    poll_messages()
  * @brief   Receive ZMQ message, thread.
  * @param   *s      Pointer to ZMQ socket, where to grab incomming messages.
@@ -143,18 +121,18 @@ int64_t get_endpoint( zmqpp::socket socket )
 ///@{
 #define RX_SIZE 1024
 
-atomic<int> new_msg (0);
-mutex mtx_poll_messages; // mutex for all resourcrs shared with recept()
+atomic<int> new_msg (0); // number of un-processed messages in buff
+mutex mtx_poll_messages; // mutex for buff to guard read/write access
 
-void poll_messages( zmqpp::socket& s, vector<string> &buff, bool stdin )
+void poll_messages( zmqpp::socket& s, vector<string> &buff )
 {
   string msg_str;
-  size_t msg_size = 0;
+  size_t msg_size = RX_SIZE;
 
   zmqpp::poller poller;
   poller.add( s );
-  const bool can_send = true;
-  if( true == stdin ) { poller.add( 1 ); }
+  //const bool can_send = true;
+  //if( true == stdin ) { poller.add( 1 ); }
 
   #if( SUPPORT_RAW_DATA == 1 )
     char msg_buff[RX_SIZE];
@@ -163,71 +141,77 @@ void poll_messages( zmqpp::socket& s, vector<string> &buff, bool stdin )
     zmqpp::message msg_zmq;
   #endif
 
+  poller.check_for( s, zmqpp::poller::poll_in );
+
   while ( s ) {
-    poller.check_for( s, ( stdin ) ? zmqpp::poller::poll_in : zmqpp::poller::poll_none );
+    printd( {"poll_messages() Waiting for messages."} );
+    /*poller.check_for( s, ( stdin ) ? zmqpp::poller::poll_in : zmqpp::poller::poll_none );
 
     if( stdin == true )
     {
       poller.check_for( stdin, ( can_send ) ? zmqpp::poller::poll_in : zmqpp::poller::poll_none );
     }
+    */
+    this_thread::sleep_for( chrono::milliseconds(10) );
 
     if ( poller.poll() ) {
-      #if( SUPPORT_RAW_DATA == 1 )
-        try {
-          printd( {"poll_message() Waiting for message."} );
-          //zmqpp::recv( socket, message );
-          s.receive_raw( &msg_buff[0], msg_size, 0 );
-          #if DEBUG == 1
-            cout << "msg_buff[] size (" << msg_size << ")" << endl;
-          #endif
+      //poller.check_for( s, zmqpp::poller::poll_none );
+      printd( {"poll_messages() Poll event."} );
+
+      if ( poller.has_input( s ) ) {
+        GET_MESSSAGE_PARTS:
+
+        msg_size = RX_SIZE;
+
+        #if( SUPPORT_RAW_DATA == 1 )
+          try {
+            //zmqpp::recv( socket, message );
+            s.receive_raw( &msg_buff[0], msg_size, 0 );
+          }
+          catch ( const std::exception& e ) {
+            printd( {"poll_message() Exception: ", e.what()} );
+            break;
+          }
+          catch (...) {
+            printd( {"poll_message() Unknown exception!"} );
+            break;
+          }
+
+          msg_str = msg_buff;
+          msg_size = length_to_null( msg_str );
+
+          // Empty buffer again
+          memset( msg_buff, 0, RX_SIZE );
+
+        #else
+          s.receive( msg_zmq, true );
+
+          // Read as a string
+          msg_zmq >> msg_str;
+          msg_size = length_to_null( msg_str );
+        #endif
+
+        printd( {"  msg_str  : ", msg_str} );
+        printd( {"  msg_size : ", std::to_string( msg_size )} );
+
+        while ( msg_size > 0 ) {
+          if ( mtx_poll_messages.try_lock() ) {
+            buff.push_back( msg_str );
+            new_msg++;
+            printd( {"  msg_cnt  : ", std::to_string( new_msg )} );
+            mtx_poll_messages.unlock();
+            break;
+          }
+
+          this_thread::sleep_for( chrono::milliseconds(12) );
         }
-        catch ( const std::exception& e ) {
-          // Defauit exception handler
-          printd( {"poll_message() Exception: ", e.what()} );
-          break;
-        }
-        catch (...) {
-          // Catch what() exceptions
-          printd( {"poll_message() Unknown exception!"} );
-          break;
-        }
 
-        msg_str = msg_buff;
-
-        // Determine message size
-        msg_size = 0;
-        while ( msg_size < RX_SIZE ) {
-          if ( msg_buff[msg_size] == '\0' ) { break; }
-        }
-
-        // Empty buffer again
-        memset( msg_buff, 0, RX_SIZE );
-
-      #else
-        s.receive( msg_zmq, true );
-
-        // Read as a string
-        msg_zmq >> msg_str;
-
-        // @note:
-        // In c++ there are
-        // (1)  C-Strings (arrays of char, null-terminated)
-        // (2)  std::string (abstract container, keeps-track of the length)
-        msg_size = length_to_null( msg_str );
-        cout << "[" << msg_size << "]" << msg_str << endl;
-      #endif
-
-      if ( msg_size > 0 ) {
-        //mtx_poll_messages.lock();
-        lock_guard<std::mutex> lock( mtx_poll_messages );
-          buff.push_back( msg_str );
-          new_msg++;
-        //mtx_poll_messages.unlock();
-        lock_guard<std::mutex> unlock( mtx_poll_messages);
+        if ( true == s.has_more_parts() ) { goto GET_MESSSAGE_PARTS; }
       }
-      //while( s.has_more_parts() ); // TODO Check for more data incomming.
     }
   }
+
+  if ( true == poller.has( s ) ) { poller.remove( s ); }
 }
 ///@}
 
@@ -253,14 +237,24 @@ int main( int argc, char **argv )
   printv( {pname, " v", VERSION} );
 
   bool socket_initialized = false;
+  bool socket_is_server   = false;
+  bool socket_can_send    = false;
+
   zmqpp::socket_type type;
   zmqpp::context context;
 
-  if ( stype == "pub"  ) { type = zmqpp::socket_type::publish; }   else
+  // Set socket modess of operation
+  if ( stype == "pub"  ) { type = zmqpp::socket_type::publish;
+                           socket_is_server = true;
+                           socket_can_send  = true; }              else
   if ( stype == "sub"  ) { type = zmqpp::socket_type::subscribe; } else
-  if ( stype == "push" ) { type = zmqpp::socket_type::push; }      else
-  if ( stype == "pull" ) { type = zmqpp::socket_type::pull; }      else
-  if ( stype == "pair" ) { type = zmqpp::socket_type::pair; }      else
+  if ( stype == "push" ) { type = zmqpp::socket_type::push;
+                           socket_can_send  = true; }              else
+  if ( stype == "pull" ) { type = zmqpp::socket_type::pull;
+                           socket_is_server = true; }              else
+  if ( stype == "pair" ) { type = zmqpp::socket_type::pair;
+                           socket_is_server = true;
+                           socket_can_send  = true; }              else
   {
       cout << "Error: Unknown socket type!" << endl;
       printhelp();
@@ -271,8 +265,7 @@ int main( int argc, char **argv )
   zmqpp::socket socket( context, type );
   zmqpp::socket *socket_ptr = &socket;
   if ( type == zmqpp::socket_type::subscribe ) { socket.subscribe( "" ); }
-  if ( type == zmqpp::socket_type::pull ) { socket.bind( endpoint ); }
-  // TODO Check if "bind" is allowed to all s-types!
+  if ( socket_is_server == true ) { socket.bind( endpoint ); }
 
   socket.connect( endpoint );
 
@@ -290,24 +283,20 @@ int main( int argc, char **argv )
   // Initialize TX-Message
   zmqpp::message tx_msg;
   string tx_msg_str;// TODO Use zmqpp::message::add_raw()
-
-  this_thread::sleep_for( chrono::milliseconds(100) );
   
   // Listen to socket and reply
-  #if( DEBUG == 1 )
-    poll_messages( *socket_ptr, ref(rx_buff), true );
-  #else
-    std::thread thr_receive(
-      poll_messages,      // void(*)(socket*, vector*)
-      std::ref( socket ), // Reference to zmqpp::socket
-      std::ref( rx_buff ) // Reference to std::vector<std::string>
-    );
-    //thr_receive.detach();
-  #endif
+  std::thread thr_receive(
+    poll_messages,      // void(*)(socket*, vector*)
+    std::ref( socket ), // Reference to zmqpp::socket
+    std::ref( rx_buff ) // Reference to std::vector<std::string>
+  );
+  thr_receive.detach();
+
+  this_thread::sleep_for( chrono::milliseconds(40) );
 
   while ( 1 ) {
     if ( new_msg > 0 ) {
-      if ( mtx_poll_messages.try_lock() ) {
+      mtx_poll_messages.lock();
         cout << rx_buff[new_msg-1] << endl;
 
         // Discard latest message
@@ -319,20 +308,22 @@ int main( int argc, char **argv )
          *			  std::sort( rx_buff.begin(), rx_buff.end() );
          */
 
-        mtx_poll_messages.unlock();
-      }
+      mtx_poll_messages.unlock();
     }
 
+    this_thread::sleep_for( chrono::milliseconds(10) );
+
     // Read terminal file descripter input
-    printd( {">>>"} );
-    std::getline( cin, tx_msg_str );
-    tx_msg << tx_msg_str;
-    // Prepare ZMQ message raw-data
-    //tx_msg.add_raw( tx_msg_string, sizeof( *tx_msg_string );
+    if ( true == socket_can_send ) {
+      cout << ">>> "; // provide a prompt
+      std::getline( cin, tx_msg_str );
+      tx_msg << tx_msg_str;
+      // Prepare ZMQ message raw-data
+      //tx_msg.add_raw( tx_msg_string, sizeof( *tx_msg_string );
 
-    // Send ZMQ message on socket
-    socket.send( tx_msg );
-
+      // Send ZMQ message on socket
+      socket.send( tx_msg );
+    }
   }
 
   // TODO Implement abort condition/signal.
@@ -341,11 +332,9 @@ int main( int argc, char **argv )
     socket.close();
   }
 
-  #if( DEBUG < 1 )
-    thr_receive.join();
-  #endif
+  thr_receive.join();
 
-  printv( {"Terminating (", to_string( rc )} );
+  printv( {"Terminating. (", to_string( rc ), ")"} );
 
   return rc;
 }
