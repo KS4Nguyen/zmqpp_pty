@@ -1,6 +1,7 @@
 #
 # Tools
 #
+APP_STL := c++_shared
 
 GCC		= gcc
 CPP		= g++
@@ -55,7 +56,7 @@ common:
 	@echo "Generated libcommon, the oldschool C low level helper converions..."
 	@echo "Example: gcc program.c libcommon.a -o program"
 	$( shell ln -s -T libcommon.a libcommon.so )
-	
+
 all: common ${TARGETS}
 
 clean:

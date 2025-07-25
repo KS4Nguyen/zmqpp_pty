@@ -1,3 +1,9 @@
+/******************************************************************************
+ * @author  KS_Nguyen <sebastian.nguyen86@gmail.com
+ * @version 2025-07-24  0.0.3
+ *                      Using zmq internal message buffer with MSG_FIFO_SIZE.
+ ******************************************************************************/
+
 #include <iostream>
 #include <string>
 #include <initializer_list> // for printv()
@@ -14,10 +20,11 @@
 #include <atomic>
 #include <chrono>
 
-#define VERSION          "0.0.2"
+#define VERSION          "0.0.3"
 
 #define DEBUG            1
 #define SUPPORT_RAW_DATA 0
+#define ZMQ_FIFO_SIZE    32
 
 
 using namespace std;
@@ -119,7 +126,7 @@ void printv( initializer_list<string> texts )
  ******************************************************************************/
 
 ///@{
-#define RX_SIZE 1024
+#define RAW_DATA_RX_SIZE 1024
 
 atomic<int> new_msg (0); // number of un-processed messages in buff
 mutex mtx_poll_messages; // mutex for buff to guard read/write access
@@ -127,7 +134,7 @@ mutex mtx_poll_messages; // mutex for buff to guard read/write access
 void poll_messages( zmqpp::socket& s, vector<string> &buff )
 {
   string msg_str;
-  size_t msg_size = RX_SIZE;
+  size_t msg_size = RAW_DATA_RX_SIZE;
 
   zmqpp::poller poller;
   poller.add( s );
@@ -135,8 +142,8 @@ void poll_messages( zmqpp::socket& s, vector<string> &buff )
   //if( true == stdin ) { poller.add( 1 ); }
 
   #if( SUPPORT_RAW_DATA == 1 )
-    char msg_buff[RX_SIZE];
-    memset( msg_buff, 0, RX_SIZE );  // Ensure nulls
+    char msg_buff[RAW_DATA_RX_SIZE];
+    memset( msg_buff, 0, RAW_DATA_RX_SIZE );  // Ensure nulls
   #else
     zmqpp::message msg_zmq;
   #endif
@@ -161,7 +168,7 @@ void poll_messages( zmqpp::socket& s, vector<string> &buff )
       if ( poller.has_input( s ) ) {
         GET_MESSSAGE_PARTS:
 
-        msg_size = RX_SIZE;
+        msg_size = RAW_DATA_RX_SIZE;
 
         #if( SUPPORT_RAW_DATA == 1 )
           try {
@@ -181,7 +188,7 @@ void poll_messages( zmqpp::socket& s, vector<string> &buff )
           msg_size = length_to_null( msg_str );
 
           // Empty buffer again
-          memset( msg_buff, 0, RX_SIZE );
+          memset( msg_buff, 0, RAW_DATA_RX_SIZE );
 
         #else
           s.receive( msg_zmq, true );
@@ -253,7 +260,6 @@ int main( int argc, char **argv )
   if ( stype == "pull" ) { type = zmqpp::socket_type::pull;
                            socket_is_server = true; }              else
   if ( stype == "pair" ) { type = zmqpp::socket_type::pair;
-                           socket_is_server = true;
                            socket_can_send  = true; }              else
   {
       cout << "Error: Unknown socket type!" << endl;
@@ -264,6 +270,23 @@ int main( int argc, char **argv )
   // Prepare socket
   zmqpp::socket socket( context, type );
   zmqpp::socket *socket_ptr = &socket;
+
+  //socket.set( zmqpp::socket_option::use_fd, true );
+
+  // Set ZMQ FIFO size
+  socket.set( zmqpp::socket_option::receive_high_water_mark, ZMQ_FIFO_SIZE );
+  socket.set( zmqpp::socket_option::send_high_water_mark, ZMQ_FIFO_SIZE );
+
+  // Set kernel puffer size when using SUPPORT_RAW_DATA
+  #if SUPPORT_RAW_DATA != 0
+    //socket.set( zmqpp::socket_option::send_buffer_size, (RAW_DATA_RX_SIZE*MSG_FIFO_SIZE) );
+    socket.set( zmqpp::socket_option::receive_buffer_size, \
+                (RAW_DATA_RX_SIZE*MSG_FIFO_SIZE) );
+  #endif
+
+  // Don't linger on aocket-close
+  socket.set( zmqpp::socket_option::linger, 0 );
+
   if ( type == zmqpp::socket_type::subscribe ) { socket.subscribe( "" ); }
   if ( socket_is_server == true ) { socket.bind( endpoint ); }
 
@@ -279,6 +302,8 @@ int main( int argc, char **argv )
 
   // Initialize RX-Buffer.
   vector<string> rx_buff;
+  //std::list rx_buff;
+  //rx_buff.begin();
 
   // Initialize TX-Message
   zmqpp::message tx_msg;
