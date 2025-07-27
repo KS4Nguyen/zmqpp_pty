@@ -1,6 +1,6 @@
 /******************************************************************************
  * @author  KS_Nguyen <sebastian.nguyen86@gmail.com
- * @version 2025-07-24  0.0.3
+ * @version 2025-07-24  0.3
  *                      Using zmq internal message buffer with MSG_FIFO_SIZE.
  ******************************************************************************/
 
@@ -20,7 +20,7 @@
 #include <atomic>
 #include <chrono>
 
-#define VERSION          "0.0.3"
+#define VERSION          "0.3"
 
 #define DEBUG            1
 #define SUPPORT_RAW_DATA 0
@@ -103,7 +103,6 @@ void printhelp()
  ******************************************************************************/
 
 ///@{
-string pname = "none";
 bool verbose = false;
 
 void printv( initializer_list<string> texts )
@@ -233,7 +232,7 @@ int main( int argc, char **argv )
 {
   int rc             = 0; // return code assertion
   verbose            = true;
-  pname              = argv[0];
+  const string pname = argv[0];
 
   string endpoint    = "tcp://localhost:4242";
   string stype       = "push";

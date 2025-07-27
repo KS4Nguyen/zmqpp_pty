@@ -3,6 +3,8 @@ build
 examples
 Debug
 Release
+src/zmq_pty_client
+src/zmq_pty_server
 
 # Documentation
 Doxyfile.bak
@@ -16,3 +18,10 @@ deprecated
 .externalToolBuilders
 perf.data
 
+# Libraries and externals
+libs/libzmq/
+libs/install_android_ndk_standalone.sh
+libs/zmq-v4.3.5-android-arm.tar.xz
+libs/zmq-v4.3.5-android-arm64.tar.xz
+libs/zmq_android.sh
+libs/zmq_java.sh
